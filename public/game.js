@@ -1,17 +1,20 @@
 let playerScore = 0;
 let aiScore = 0;
 let isPlayerTurn = true;
+let gameId = crypto.randomUUID();
+let questionId = 0;
 
 const inputArea = document.getElementById('input-area');
 const instructions = document.getElementById('instructions');
 const submitBtn = document.getElementById('submit-btn');
-const nextRoundBtn = document.getElementById('next-round-btn'); // ✅ Fix: declare this!
+const nextRoundBtn = document.getElementById('next-round-btn');
 const results = document.getElementById('results');
 const scoreboard = document.getElementById('scoreboard');
 
 function renderInputFields() {
   inputArea.innerHTML = '';
   results.innerText = '';
+
   if (isPlayerTurn) {
     instructions.innerText = 'Enter two truths and one lie. Select the lie.';
     for (let i = 0; i < 3; i++) {
@@ -23,16 +26,16 @@ function renderInputFields() {
     }
   } else {
     instructions.innerText = 'AI is preparing statements. Please wait...';
-
-    fetch('/ai-turn')
+    fetch(`/ai-turn/${gameId}/${questionId}`)
       .then(res => res.json())
       .then(data => {
         const statements = data.statements;
-        inputArea.innerHTML = statements.map((s, i) => 
-          `<div>
-            <input type="radio" name="guess" value="${i}"> ${s}
-          </div>`
-        ).join('');
+        inputArea.innerHTML = statements.map((s, i) => `
+          <div class="statement-block">
+            <input type="radio" name="guess" value="${i}">
+            <span>${s}</span>
+          </div>
+        `).join('');
       });
   }
 }
@@ -45,42 +48,52 @@ function handleSubmit() {
       document.getElementById('stmt2').value
     ];
     const lieRadio = document.querySelector('input[name="lie"]:checked');
-    if (!lieRadio) {
-      alert('Please select which one is the lie!');
-      return;
-    }
+    if (!lieRadio) return alert('Please select the lie!');
     const lieIndex = parseInt(lieRadio.value);
-    const prompt = `These are 3 statements: ${statements.join(' | ')}. Guess which one is a lie.`;
 
-    fetch('/player-turn', {
+    fetch(`/player-turn/${gameId}/${questionId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, statements, lieIndex })
+      body: JSON.stringify({ statements, lieIndex })
     })
     .then(res => res.json())
     .then(data => {
-      const guessNum = data.aiGuessIndex;
+      const aiLie = data.aiReply; // AI's lie statement
+      const reason = data.reason; // AI's reasoning
       results.innerHTML = `
-        <strong>AI guessed:</strong> Statement ${guessNum} - "${data.aiGuess}"<br>
-        <strong>Reason:</strong> ${data.reason}<br>
+        <strong>AI guessed:</strong> "${aiLie}"<br>
+        <strong>Reason:</strong> ${reason}<br>
         <strong>${data.correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
       `;
       if (data.correct) aiScore++;
       updateScore();
-      isPlayerTurn = false;
       submitBtn.disabled = true;
       nextRoundBtn.style.display = 'inline-block';
+      isPlayerTurn = false;
     });
   } else {
     const selected = document.querySelector('input[name="guess"]:checked');
     if (!selected) return alert('Pick one!');
     const pickedIndex = parseInt(selected.value);
-    if (pickedIndex === 2) playerScore++; // TODO: make AI lie tracking more dynamic
-    results.innerText = 'You guessed: Statement ' + (pickedIndex + 1);
-    updateScore();
-    isPlayerTurn = true;
-    submitBtn.disabled = true;
-    nextRoundBtn.style.display = 'inline-block';
+
+    fetch(`/ai-turn/${gameId}/${questionId}/guess`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ guessIndex: pickedIndex })
+    })
+    .then(res => res.json())
+    .then(data => {
+      results.innerHTML = `
+        <strong>You guessed:</strong> Statement ${pickedIndex + 1}<br>
+        <strong>Actual lie:</strong> "${data.actualLie}"<br>
+        <strong>${data.correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
+      `;
+      if (data.correct) playerScore++;
+      updateScore();
+      submitBtn.disabled = true;
+      nextRoundBtn.style.display = 'inline-block';
+      isPlayerTurn = true;
+    });
   }
 }
 
@@ -88,10 +101,10 @@ function handleSubmit() {
 function updateScore() {
   scoreboard.innerText = `Player: ${playerScore} | AI: ${aiScore}`;
   if (playerScore >= 5) {
-    alert('You win!');
+    alert('🎉 You win!');
     resetGame();
   } else if (aiScore >= 5) {
-    alert('AI wins!');
+    alert('🤖 AI wins!');
     resetGame();
   }
 }
@@ -99,6 +112,8 @@ function updateScore() {
 function resetGame() {
   playerScore = 0;
   aiScore = 0;
+  questionId = 0;
+  gameId = crypto.randomUUID();
   isPlayerTurn = true;
   renderInputFields();
   updateScore();
@@ -107,8 +122,9 @@ function resetGame() {
 submitBtn.addEventListener('click', handleSubmit);
 
 nextRoundBtn.addEventListener('click', () => {
-  nextRoundBtn.style.display = 'none';
+  questionId++;
   submitBtn.disabled = false;
+  nextRoundBtn.style.display = 'none';
   renderInputFields();
 });
 

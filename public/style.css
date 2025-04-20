@@ -65,6 +65,21 @@ button {
 button:hover {
   background-color: #45a049;
 }
+button:disabled {
+  background-color: #ccc !important;
+  color: #666 !important;
+  cursor: not-allowed;
+}
+#submit-btn:disabled {
+  background-color: #ccc !important;
+  color: #666 !important;
+  cursor: not-allowed;
+}
+#submit-btn {
+  background-color: #4CAF50; /* or your preferred color */
+  color: white;
+  cursor: pointer;
+}
 
 #results {
   margin-top: 1.5em;

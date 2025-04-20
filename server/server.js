@@ -40,6 +40,13 @@ app.post('/player-turn/:gameId/:questionId', async (req, res) => {
       }
     });
 
+    const responseData = aiResponse.data;
+
+    if (!responseData.choices || !responseData.choices[0]?.message?.content) {
+      const errorMessage = responseData.error?.message || 'Unexpected AI response structure';
+      return res.status(500).json({ error: `🤖 AI Error: ${errorMessage}` });
+    }
+
     const aiResponseText = aiResponse.data.choices[0].message.content.trim();
 
     // Regex to match the ai-reply and reason sections
@@ -78,7 +85,13 @@ app.get('/ai-turn/:gameId/:questionId', async (req, res) => {
   const topics = ['animals', 'space', 'history', 'technology', 'food', 'travel', 'music'];
   const randomTopic = topics[Math.floor(Math.random() * topics.length)];
 
-  const prompt = `Give me 2 truths and 1 lie about ${randomTopic}. Label the lie as [LIE]. Format each statement on its own line.`;
+  const prompt = `Give me exactly 2 truths and exactly 1 lie about ${randomTopic}. 
+  Label the lie as [LIE]. 
+  Make sure each lie and each truth is on a new line. 
+  Make sure the statement which is a lie is not always the first or last. 
+  Dont give any explanation or additional text. Your reply should contain exactly 3 statement 
+  one of which is a lie. When you have picked the 3 sentences to return, shuffle them 
+  so that the lie appears on a different line each time.`;
 
   try {
     const aiResponse = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
@@ -95,30 +108,36 @@ app.get('/ai-turn/:gameId/:questionId', async (req, res) => {
 
     const rawText = aiResponse.data.choices[0].message.content;
 
-    const cleanedLines = rawText
+    const lines = rawText
       .split('\n')
       .map(line => line.trim())
-      .filter(line =>
-        line && // non-empty
-        !/^here are/i.test(line) && // skip intro like "Here are 2 truths..."
-        !/let me know/i.test(line) && // skip outro
-        /[.?!]$|(\[LIE\])/i.test(line) // line looks like a statement
-      );
+      .filter(Boolean);
 
-    const statements = cleanedLines
+    let intro = '';
+    const statementLines = [];
+
+    for (const line of lines) {
+      if (/^here (are|'s)/i.test(line)) {
+        intro = line;
+      } else if (!/let me know/i.test(line)) {
+        statementLines.push(line);
+      }
+    }
+
+    const statements = statementLines
       .map(line => line.replace(/^[0-9]+\.\s*/, '').replace(/\[LIE\]/i, '').trim());
 
-    const lieIndex = cleanedLines.findIndex(line => /\[LIE\]/i.test(line));
+    const lieIndex = statementLines.findIndex(line => /\[LIE\]/i.test(line));
 
     if (statements.length !== 3 || lieIndex === -1) {
       return res.status(500).json({ error: 'Invalid AI response format', raw: rawText });
     }
 
-    // Store in session
     if (!gameSessions[gameId]) gameSessions[gameId] = {};
     gameSessions[gameId][questionId] = { statements, lieIndex };
 
-    res.json({ statements });
+    res.json({ intro, statements });
+
   } catch (error) {
     console.error('AI error:', error.response?.data || error.message);
     res.status(500).json({ error: 'AI failed to generate statements' });

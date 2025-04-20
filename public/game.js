@@ -25,11 +25,18 @@ function renderInputFields() {
         </div>`;
     }
   } else {
+    // Show temporary loading message
     instructions.innerText = 'AI is preparing statements. Please wait...';
+
     fetch(`/ai-turn/${gameId}/${questionId}`)
       .then(res => res.json())
       .then(data => {
-        const statements = data.statements;
+        const { intro, statements } = data;
+
+        // Replace instructions with AI intro
+        instructions.innerText = intro || 'AI has provided its statements. Pick the lie.';
+
+        // Render AI statements with radio buttons
         inputArea.innerHTML = statements.map((s, i) => `
           <div class="statement-block">
             <input type="radio" name="guess" value="${i}">
@@ -56,21 +63,43 @@ function handleSubmit() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ statements, lieIndex })
     })
-    .then(res => res.json())
-    .then(data => {
-      const aiLie = data.aiReply; // AI's lie statement
-      const reason = data.reason; // AI's reasoning
+    .then(async res => {
+      const data = await res.json();
+    
+      if (!res.ok) {
+        // Server returned error (e.g., 500 or 429)
+        throw new Error(data.error || 'Unknown server error');
+      }
+    
+      if (data.error) {
+        // Server responded with error in payload
+        throw new Error(data.error);
+      }
+    
+      const aiLie = data.aiReply;
+      const reason = data.reason;
+    
       results.innerHTML = `
         <strong>AI guessed:</strong> "${aiLie}"<br>
         <strong>Reason:</strong> ${reason}<br>
         <strong>${data.correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
       `;
+    
       if (data.correct) aiScore++;
       updateScore();
       submitBtn.disabled = true;
       nextRoundBtn.style.display = 'inline-block';
       isPlayerTurn = false;
-    });
+    })
+    .catch(err => {
+      console.error('Error during AI guess:', err);
+      results.innerHTML = `
+        <strong>❌ Error:</strong> ${err.message}<br>
+        <em>The server failed to process your request. Please try again later.</em>
+      `;
+      submitBtn.disabled = true;
+      nextRoundBtn.style.display = 'inline-block';
+    });    
   } else {
     const selected = document.querySelector('input[name="guess"]:checked');
     if (!selected) return alert('Pick one!');

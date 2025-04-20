@@ -10,6 +10,10 @@ const submitBtn = document.getElementById('submit-btn');
 const nextRoundBtn = document.getElementById('next-round-btn');
 const results = document.getElementById('results');
 const scoreboard = document.getElementById('scoreboard');
+const API_BASE_URL = window.location.origin.includes('localhost')
+  ? 'http://localhost:3000'
+  : 'https://two-truths-and-a-lie-with-ai.vercel.app/';
+
 
 function renderInputFields() {
   inputArea.innerHTML = '';
@@ -28,7 +32,7 @@ function renderInputFields() {
     // Show temporary loading message
     instructions.innerText = 'AI is preparing statements. Please wait...';
 
-    fetch(`/ai-turn/${gameId}/${questionId}`)
+    fetch(`${API_BASE_URL}/ai-turn/${gameId}/${questionId}`)
       .then(res => res.json())
       .then(data => {
         const { intro, statements } = data;
@@ -58,7 +62,7 @@ function handleSubmit() {
     if (!lieRadio) return alert('Please select the lie!');
     const lieIndex = parseInt(lieRadio.value);
 
-    fetch(`/player-turn/${gameId}/${questionId}`, {
+    fetch(`${API_BASE_URL}/player-turn/${gameId}/${questionId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ statements, lieIndex })
@@ -105,7 +109,7 @@ function handleSubmit() {
     if (!selected) return alert('Pick one!');
     const pickedIndex = parseInt(selected.value);
 
-    fetch(`/ai-turn/${gameId}/${questionId}/guess`, {
+    fetch(`${API_BASE_URL}/ai-turn/${gameId}/${questionId}/guess`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ guessIndex: pickedIndex })

@@ -11,9 +11,10 @@ const nextRoundBtn = document.getElementById('next-round-btn');
 const results = document.getElementById('results');
 const scoreboard = document.getElementById('scoreboard');
 const API_BASE_URL = window.location.origin.includes('localhost')
-  ? 'http://localhost:3000'
-  : 'https://two-truths-and-a-lie-with-ai.vercel.app/';
+  ? 'http://localhost:3000/api'
+  : 'https://two-truths-and-a-lie-with-ai.vercel.app/api';
 
+let encodedLieIndex = null;
 
 function renderInputFields() {
   inputArea.innerHTML = '';
@@ -29,24 +30,24 @@ function renderInputFields() {
         </div>`;
     }
   } else {
-    // Show temporary loading message
     instructions.innerText = 'AI is preparing statements. Please wait...';
 
-    fetch(`${API_BASE_URL}/ai-turn/${gameId}/${questionId}`)
+    fetch(`${API_BASE_URL}/ai-turn?gameId=${gameId}&questionId=${questionId}`)
       .then(res => res.json())
       .then(data => {
-        const { intro, statements } = data;
-
-        // Replace instructions with AI intro
-        instructions.innerText = intro || 'AI has provided its statements. Pick the lie.';
-
-        // Render AI statements with radio buttons
+        const { statements, encodedLieIndex: encoded } = data;
+        encodedLieIndex = encoded;
+        instructions.innerText = 'AI has provided its statements. Pick the lie.';
         inputArea.innerHTML = statements.map((s, i) => `
           <div class="statement-block">
             <input type="radio" name="guess" value="${i}">
             <span>${s}</span>
           </div>
         `).join('');
+      })
+      .catch(err => {
+        instructions.innerText = '❌ Failed to get AI statements.';
+        console.error(err);
       });
   }
 }
@@ -62,34 +63,20 @@ function handleSubmit() {
     if (!lieRadio) return alert('Please select the lie!');
     const lieIndex = parseInt(lieRadio.value);
 
-    fetch(`${API_BASE_URL}/player-turn/${gameId}/${questionId}`, {
+    fetch(`${API_BASE_URL}/player-turn`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ statements, lieIndex })
+      body: JSON.stringify({ statements, lieIndex, gameId, questionId })
     })
-    .then(async res => {
-      const data = await res.json();
-    
-      if (!res.ok) {
-        // Server returned error (e.g., 500 or 429)
-        throw new Error(data.error || 'Unknown server error');
-      }
-    
-      if (data.error) {
-        // Server responded with error in payload
-        throw new Error(data.error);
-      }
-    
-      const aiLie = data.aiReply;
-      const reason = data.reason;
-    
+    .then(res => res.json())
+    .then(data => {
+      const { aiReply, reason, correct } = data;
       results.innerHTML = `
-        <strong>AI guessed:</strong> "${aiLie}"<br>
+        <strong>AI guessed:</strong> "${aiReply}"<br>
         <strong>Reason:</strong> ${reason}<br>
-        <strong>${data.correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
+        <strong>${correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
       `;
-    
-      if (data.correct) aiScore++;
+      if (correct) aiScore++;
       updateScore();
       submitBtn.disabled = true;
       nextRoundBtn.style.display = 'inline-block';
@@ -103,33 +90,36 @@ function handleSubmit() {
       `;
       submitBtn.disabled = true;
       nextRoundBtn.style.display = 'inline-block';
-    });    
+    });
   } else {
     const selected = document.querySelector('input[name="guess"]:checked');
     if (!selected) return alert('Pick one!');
     const pickedIndex = parseInt(selected.value);
 
-    fetch(`${API_BASE_URL}/ai-turn/${gameId}/${questionId}/guess`, {
+    fetch(`${API_BASE_URL}/ai-guess`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guessIndex: pickedIndex })
+      body: JSON.stringify({ guessIndex: pickedIndex, encodedLieIndex, gameId, questionId })
     })
     .then(res => res.json())
     .then(data => {
+      const { correct } = data;
       results.innerHTML = `
         <strong>You guessed:</strong> Statement ${pickedIndex + 1}<br>
-        <strong>Actual lie:</strong> "${data.actualLie}"<br>
-        <strong>${data.correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
+        <strong>${correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
       `;
-      if (data.correct) playerScore++;
+      if (correct) playerScore++;
       updateScore();
       submitBtn.disabled = true;
       nextRoundBtn.style.display = 'inline-block';
       isPlayerTurn = true;
+    })
+    .catch(err => {
+      console.error('Error checking guess:', err);
+      results.innerHTML = '<strong>❌ Error checking your guess.</strong>';
     });
   }
 }
-
 
 function updateScore() {
   scoreboard.innerText = `Player: ${playerScore} | AI: ${aiScore}`;
@@ -153,7 +143,6 @@ function resetGame() {
 }
 
 submitBtn.addEventListener('click', handleSubmit);
-
 nextRoundBtn.addEventListener('click', () => {
   questionId++;
   submitBtn.disabled = false;

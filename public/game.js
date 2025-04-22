@@ -41,9 +41,10 @@ function renderInputFields() {
         inputArea.innerHTML = statements.map((s, i) => `
           <div class="statement-block">
             <input type="radio" name="guess" value="${i}">
-            <span>${s}</span>
+            <span id="stmt${i}">${s}</span>
           </div>
         `).join('');
+
       })
       .catch(err => {
         instructions.innerText = '❌ Failed to get AI statements.';
@@ -106,6 +107,11 @@ function handleSubmit() {
       nextRoundBtn.style.display = 'inline-block';
     });  
   } else {
+    const statements = [
+      document.getElementById('stmt0')?.textContent,
+      document.getElementById('stmt1')?.textContent,
+      document.getElementById('stmt2')?.textContent
+    ];
     const selected = document.querySelector('input[name="guess"]:checked');
     if (!selected) return alert('Pick one!');
     const pickedIndex = parseInt(selected.value);
@@ -113,15 +119,17 @@ function handleSubmit() {
     fetch(`${API_BASE_URL}/guess`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ guessIndex: pickedIndex, encodedLieIndex, gameId, questionId })
+      body: JSON.stringify({ statements, guessIndex: pickedIndex, encodedLieIndex, gameId, questionId })
     })
     .then(res => res.json())
     .then(data => {
-      const { correct } = data;
+      const { correct, correctStatement } = data;
+    
       results.innerHTML = `
         <strong>You guessed:</strong> Statement ${pickedIndex + 1}<br>
-        <strong>${correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
-      `;
+        <strong>${correct ? '✅ Correct!' : '❌ Incorrect!'}</strong><br>
+        ${!correct ? `<strong>The correct lie was:</strong> "${correctStatement}"` : ''}
+      `;    
       if (correct) playerScore++;
       updateScore();
       submitBtn.disabled = true;

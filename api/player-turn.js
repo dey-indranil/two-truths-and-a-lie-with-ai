@@ -38,7 +38,7 @@ module.exports = async (req, res) => {
 
     const aiResponseText = aiResponse.data.choices[0].message.content.trim();
     console.log('AI response text:', aiResponseText);
-    const regex = /{ai-reply:\s*(.*?)\s*,\s*reason:\s*(.*?)}/s;
+    const regex = /ai-reply:\s*(.*)\s*reason:\s*(.*)/s;
     const match = aiResponseText.match(regex);
 
     if (!match) {
@@ -48,7 +48,7 @@ module.exports = async (req, res) => {
     let aiReply = match[1].trim().replace(/^"|"$/g, '');
     const reason = match[2].trim();
 
-    const correct = aiReply === statements[lieIndex];
+    const correct = aiReply.includes(statements[lieIndex].trim());
 
     res.json({
       gameId,

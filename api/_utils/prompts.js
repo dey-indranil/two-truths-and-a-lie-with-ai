@@ -14,11 +14,13 @@ module.exports = {
         - Two must be TRUE.
         - One must be a LIE.
         - Label the lie with [LIE] at the end of the sentence.
-        
+
         Your response must follow **this exact format**:
         1. <statement>
         2. <statement>
         3. <statement>
         
+        Please shuffle the order of the statements randomly, along with the label so the lie does not always appear last.
+        Make sure the lie is **plausible**, but clearly false, and does not confuse with any of the true facts.
         Only return the 3 statements in this format. Do NOT include any explanations, greetings, or additional text.`        
 }

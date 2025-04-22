@@ -2,7 +2,7 @@ const axios = require('axios');
 
 async function getAIResponse(prompt) {
   const useLocalAI = process.env.USE_LOCAL_AI === 'true';
-
+  console.log('Using local AI:', useLocalAI);
   if (useLocalAI) {
     // Local Ollama
     const res = await axios.post('http://localhost:11434/api/generate', {

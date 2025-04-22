@@ -110,7 +110,7 @@ function handleSubmit() {
     if (!selected) return alert('Pick one!');
     const pickedIndex = parseInt(selected.value);
 
-    fetch(`${API_BASE_URL}/ai-guess`, {
+    fetch(`${API_BASE_URL}/guess`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ guessIndex: pickedIndex, encodedLieIndex, gameId, questionId })

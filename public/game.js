@@ -33,23 +33,38 @@ function renderInputFields() {
     instructions.innerText = 'AI is preparing statements. Please wait...';
 
     fetch(`${API_BASE_URL}/ai-turn?gameId=${gameId}&questionId=${questionId}`)
-      .then(res => res.json())
-      .then(data => {
-        const { statements, encodedLieIndex: encoded } = data;
-        encodedLieIndex = encoded;
-        instructions.innerText = 'AI has provided its statements. Pick the lie.';
-        inputArea.innerHTML = statements.map((s, i) => `
-          <div class="statement-block">
-            <input type="radio" name="guess" value="${i}">
-            <span id="stmt${i}">${s}</span>
-          </div>
-        `).join('');
+    .then(async res => {
+      const data = await res.json();
+    
+      if (!res.ok) {
+        // Server returned error (e.g., 500 or 429)
+        throw new Error(data.error || 'Unknown server error');
+      }
+    
+      if (data.error) {
+        // Server responded with error in payload
+        throw new Error(data.error);
+      }
+      const { statements, encodedLieIndex: encoded } = data;
+      encodedLieIndex = encoded;
+      instructions.innerText = 'AI has provided its statements. Pick the lie.';
+      inputArea.innerHTML = statements.map((s, i) => `
+        <div class="statement-block">
+          <input type="radio" name="guess" value="${i}">
+          <span id="stmt${i}">${s}</span>
+        </div>
+      `).join('');
 
-      })
-      .catch(err => {
-        instructions.innerText = '❌ Failed to get AI statements.';
-        console.error(err);
-      });
+    })
+    .catch(err => {
+      console.error('Error during AI guess:', err);
+      results.innerHTML = `
+        <strong>❌ Error:</strong> ${err.message}<br>
+        <em>The server failed to process your request. Please try again later.</em>
+      `;
+      submitBtn.disabled = true;
+      nextRoundBtn.style.display = 'inline-block';
+    });
   }
 }
 

@@ -1,7 +1,18 @@
 const axios = require('axios');
 const prompts = require('./_utils/prompts');
+const { getAIResponse } = require('./_utils/ai');
 
 module.exports = async (req, res) => {
+  // CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  // Handle CORS preflight
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -16,21 +27,18 @@ module.exports = async (req, res) => {
   const prompt = prompts.playerTurnPrompt(statements);
 
   try {
-    const aiResponse = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'meta-llama/llama-4-scout:free',
-      messages: [{ role: 'user', content: prompt }]
-    }, {
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'Two Truths Game'
-      }
-    });
+    const aiResponse = await getAIResponse(prompt);
+    console.log('AI response:', aiResponse);
+    const responseData = aiResponse.data;
+    console.log('AI response:', responseData);
+    if (!responseData.choices || !responseData.choices[0]?.message?.content) {
+      const errorMessage = responseData.error?.message || 'Unexpected AI response structure';
+      return res.status(500).json({ error: `🤖 AI Error: ${errorMessage}` });
+    }
 
     const aiResponseText = aiResponse.data.choices[0].message.content.trim();
-
-    const regex = /{ai-reply:\s*(.*?)\s*,\s*reason:\s*(.*?)}/s;
+    console.log('AI response text:', aiResponseText);
+    const regex = /ai-reply:\s*(.*)\s*reason:\s*(.*)/s;
     const match = aiResponseText.match(regex);
 
     if (!match) {
@@ -40,7 +48,7 @@ module.exports = async (req, res) => {
     let aiReply = match[1].trim().replace(/^"|"$/g, '');
     const reason = match[2].trim();
 
-    const correct = aiReply === statements[lieIndex];
+    const correct = aiReply.includes(statements[lieIndex].trim());
 
     res.json({
       gameId,

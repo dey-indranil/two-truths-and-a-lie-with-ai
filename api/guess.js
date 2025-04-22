@@ -7,12 +7,27 @@ function encodeIndex(index, gameId, questionId) {
   hmac.update(`${gameId}:${questionId}:${index}`);
   return hmac.digest('hex');
 }
-
+function decodeIndex(encodedLieIndex, gameId, questionId) {
+  for (let i = 0; i < 3; i++) {
+    const test = encodeIndex(i, gameId, questionId);
+    if (test === encodedLieIndex) {
+      return i;
+    }
+  }
+  return -1; // In case of no match
+}
 module.exports = (req, res) => {
-  const { gameId, questionId, guessIndex, encodedLieIndex } = req.body;
+  const { statements, gameId, questionId, guessIndex, encodedLieIndex } = req.body;
 
-  const guessedByUser = encodeIndex(guessIndex, gameId, questionId);
-  const correct = guessedByUser === encodedLieIndex;
+  const actualLieIndex = decodeIndex(encodedLieIndex, gameId, questionId);
+  if (actualLieIndex === -1) {
+    return res.status(400).json({ error: 'Unable to decode the correct answer' });
+  }
+  const correct = guessIndex === actualLieIndex;
+  const correctStatement = statements[actualLieIndex];
 
-  res.status(200).json({ correct });
+  res.status(200).json({
+    correct,
+    correctStatement
+  });
 };

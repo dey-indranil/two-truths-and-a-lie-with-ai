@@ -1,5 +1,6 @@
 const axios = require('axios');
 const prompts = require('./_utils/prompts');
+const { getAIResponse } = require('./_utils/ai');
 
 module.exports = async (req, res) => {
   if (req.method !== 'POST') {
@@ -16,17 +17,14 @@ module.exports = async (req, res) => {
   const prompt = prompts.playerTurnPrompt(statements);
 
   try {
-    const aiResponse = await axios.post('https://openrouter.ai/api/v1/chat/completions', {
-      model: 'meta-llama/llama-4-scout:free',
-      messages: [{ role: 'user', content: prompt }]
-    }, {
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'http://localhost:3000',
-        'X-Title': 'Two Truths Game'
-      }
-    });
+    const aiResponse = getAIResponse(prompt);
+
+    const responseData = aiResponse.data;
+    console.log('AI response:', responseData);
+    if (!responseData.choices || !responseData.choices[0]?.message?.content) {
+      const errorMessage = responseData.error?.message || 'Unexpected AI response structure';
+      return res.status(500).json({ error: `🤖 AI Error: ${errorMessage}` });
+    }
 
     const aiResponseText = aiResponse.data.choices[0].message.content.trim();
 

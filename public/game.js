@@ -68,15 +68,29 @@ function handleSubmit() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ statements, lieIndex, gameId, questionId })
     })
-    .then(res => res.json())
-    .then(data => {
-      const { aiReply, reason, correct } = data;
+    .then(async res => {
+      const data = await res.json();
+    
+      if (!res.ok) {
+        // Server returned error (e.g., 500 or 429)
+        throw new Error(data.error || 'Unknown server error');
+      }
+    
+      if (data.error) {
+        // Server responded with error in payload
+        throw new Error(data.error);
+      }
+    
+      const aiLie = data.aiReply;
+      const reason = data.reason;
+    
       results.innerHTML = `
-        <strong>AI guessed:</strong> "${aiReply}"<br>
+        <strong>AI guessed:</strong> "${aiLie}"<br>
         <strong>Reason:</strong> ${reason}<br>
-        <strong>${correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
+        <strong>${data.correct ? '✅ Correct!' : '❌ Incorrect!'}</strong>
       `;
-      if (correct) aiScore++;
+    
+      if (data.correct) aiScore++;
       updateScore();
       submitBtn.disabled = true;
       nextRoundBtn.style.display = 'inline-block';
@@ -90,7 +104,7 @@ function handleSubmit() {
       `;
       submitBtn.disabled = true;
       nextRoundBtn.style.display = 'inline-block';
-    });
+    });  
   } else {
     const selected = document.querySelector('input[name="guess"]:checked');
     if (!selected) return alert('Pick one!');
